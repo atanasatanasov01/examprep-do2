@@ -54,4 +54,30 @@ SCRIPT
 
 NETWORK
     end
+    $puppetrpm = <<PUPPETRPM
+    sudo dnf install -y https://yum.puppet.com/puppet7-release-el-8.noarch.rpm
+    sudo dnf install -y puppet
+PUPPETRPM
+
+    $modulesweb = <<MODULESWEB
+    puppet module install puppetlabs-vcsrepo
+    puppet module install puppetlabs-firewall
+    puppet module install puppet-selinux
+    sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
+MODULESWEB
+
+    config.vm.define "web" do |web|
+      web.vm.box = "shekeriev/centos-stream-8"
+      web.vm.hostname = "web.do2.lab"
+      web.vm.network "private_network", ip: "192.168.99.101"
+      web.vm.provision "shell", inline: $puppetrpm, privileged: false
+      web.vm.provision "shell", inline: $modulesweb, privileged: false
+      
+      web.vm.provision "puppet" do |puppet|
+        puppet.manifests_path = "manifests"
+        puppet.manifest_file = "web.pp"
+        puppet.options = "--verbose --debug"
+      end
+    end
+
   end
