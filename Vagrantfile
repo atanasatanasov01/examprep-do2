@@ -10,7 +10,7 @@ Vagrant.configure(2) do |config|
       docker.vm.hostname = "docker.do2.lab"
       docker.vm.network "private_network", ip: "192.168.99.100"
       docker.vm.network "forwarded_port", guest: 80, host: 8000
-  
+
       docker.vm.provision "shell", inline: <<EOS
   echo "* Add EPEL repository ..."
   dnf install -y epel-release
@@ -51,7 +51,6 @@ SCRIPT
       docker network rm appnet || true
       echo "* Creating the app"
       docker network create appnet
-
 NETWORK
     end
     $puppetrpm = <<PUPPETRPM
@@ -66,6 +65,13 @@ PUPPETRPM
     sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
 MODULESWEB
 
+  $modulesdb = <<MODULESDB
+puppet module install puppetlabs-vcsrepo
+puppet module install puppetlabs-firewall
+puppet module install puppetlabs/mysql
+sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
+MODULESDB
+
     config.vm.define "web" do |web|
       web.vm.box = "shekeriev/centos-stream-8"
       web.vm.hostname = "web.do2.lab"
@@ -76,6 +82,21 @@ MODULESWEB
       web.vm.provision "puppet" do |puppet|
         puppet.manifests_path = "manifests"
         puppet.manifest_file = "web.pp"
+        puppet.options = "--verbose --debug"
+      end
+    end
+
+
+    config.vm.define "db" do |db|
+      db.vm.box = "shekeriev/centos-stream-8"
+      db.vm.hostname = "db.do2.lab"
+      db.vm.network "private_network", ip: "192.168.99.102"
+      db.vm.provision "shell", inline: $puppetrpm, privileged: false
+      db.vm.provision "shell", inline: $modulesdb, privileged: false
+  
+      db.vm.provision "puppet" do |puppet|
+        puppet.manifests_path = "manifests"
+        puppet.manifest_file = "db.pp"
         puppet.options = "--verbose --debug"
       end
     end
