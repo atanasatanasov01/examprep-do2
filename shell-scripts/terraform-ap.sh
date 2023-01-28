@@ -1,8 +1,5 @@
 #!/bin/bash
 
-#echo "* Copy all local files"
-#cp -R /vagrant/* .
-
 echo "* Run the kafka cluster ..."
 terraform -chdir=/vagrant/terraform-1-kafka init
 terraform -chdir=/vagrant/terraform-1-kafka apply -auto-approve
