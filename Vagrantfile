@@ -6,37 +6,12 @@ Vagrant.configure(2) do |config|
     config.ssh.insert_key = false
   
     config.vm.define "docker" do |docker|
-      docker.vm.box = "shekeriev/centos-stream-9"
+      docker.vm.box = "shekeriev/debian-11"
       docker.vm.hostname = "docker.do2.lab"
       docker.vm.network "private_network", ip: "192.168.99.100"
       docker.vm.network "forwarded_port", guest: 80, host: 8000
-
-      docker.vm.provision "shell", inline: <<EOS
-  echo "* Add EPEL repository ..."
-  dnf install -y epel-release
-  
-  echo "* Install Python3 ..." 
-  dnf install -y python3 python3-pip
-  
-  echo "* Install Python docker module ..."
-  pip3 install docker
-EOS
-        docker.vm.provision "shell", inline: <<SCRIPT
-
-echo "* Download Terraform" 
-wget https://releases.hashicorp.com/terraform/1.3.7/terraform_1.3.7_linux_amd64.zip -O /tmp/terraform.zip
-
-echo "* Unzip Terraform"
-unzip /tmp/terraform.zip
-
-echo "* Move Terraform"
-mv terraform /usr/local/bin
-
-echo "* Remove the Terraform archive"
-rm /tmp/terraform.zip
-SCRIPT
-
-
+      docker.vm.provision "shell", path: "shell-scripts/install-tf.sh"
+      docker.vm.provision "shell", path: "shell-scripts/ansible-req.sh"
       docker.vm.provision "ansible_local" do |ansible|
         ansible.become = true
         ansible.install_mode = :default
@@ -45,39 +20,21 @@ SCRIPT
         ansible.galaxy_roles_path = "/etc/ansible/roles"
         ansible.galaxy_command = "sudo ansible-galaxy install --role-file=%{role_file} --roles-path=%{roles_path} --force"
       end
-       
-      docker.vm.provision "shell", inline: <<NETWORK
-      echo "* Remove the network if it already exists.."
-      docker network rm appnet || true
-      echo "* Creating the app"
-      docker network create appnet
-NETWORK
+#      docker.vm.provision "shell", path: "shell-scripts/create-network.sh"
+      docker.vm.provision "shell", path: "shell-scripts/test.sh"
+      docker.vm.provider "virtualbox" do |v|
+        v.gui = false
+        v.memory = 2048
+        v.cpus = 2
+      end
     end
-    $puppetrpm = <<PUPPETRPM
-    sudo dnf install -y https://yum.puppet.com/puppet7-release-el-8.noarch.rpm
-    sudo dnf install -y puppet
-PUPPETRPM
-
-    $modulesweb = <<MODULESWEB
-    puppet module install puppetlabs-vcsrepo
-    puppet module install puppetlabs-firewall
-    puppet module install puppet-selinux
-    sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
-MODULESWEB
-
-  $modulesdb = <<MODULESDB
-puppet module install puppetlabs-vcsrepo
-puppet module install puppetlabs-firewall
-puppet module install puppetlabs/mysql
-sudo cp -vR ~/.puppetlabs/etc/code/modules/ /etc/puppetlabs/code/
-MODULESDB
 
     config.vm.define "web" do |web|
       web.vm.box = "shekeriev/centos-stream-8"
       web.vm.hostname = "web.do2.lab"
       web.vm.network "private_network", ip: "192.168.99.101"
-      web.vm.provision "shell", inline: $puppetrpm, privileged: false
-      web.vm.provision "shell", inline: $modulesweb, privileged: false
+      web.vm.provision "shell", path: "shell-scripts/puppet.sh"
+      web.vm.provision "shell", path: "shell-scripts/puppet-web.sh"
       
       web.vm.provision "puppet" do |puppet|
         puppet.manifests_path = "manifests"
@@ -91,9 +48,8 @@ MODULESDB
       db.vm.box = "shekeriev/centos-stream-8"
       db.vm.hostname = "db.do2.lab"
       db.vm.network "private_network", ip: "192.168.99.102"
-      db.vm.provision "shell", inline: $puppetrpm, privileged: false
-      db.vm.provision "shell", inline: $modulesdb, privileged: false
-  
+      db.vm.provision "shell", path: "shell-scripts/puppet.sh"
+      db.vm.provision "shell", path: "shell-scripts/puppet-db.sh"
       db.vm.provision "puppet" do |puppet|
         puppet.manifests_path = "manifests"
         puppet.manifest_file = "db.pp"

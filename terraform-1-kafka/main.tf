@@ -18,6 +18,11 @@ resource "docker_image" "img-exporter" {
     name = "danielqsj/kafka-exporter"
 }
 
+resource "docker_network" "appnet" {
+  name = "appnet"
+  driver = "bridge"
+}
+
 resource "docker_container" "zookeeper" {
     name = "zookeeper"
     image = docker_image.img-zookeeper.image_id
