@@ -71,4 +71,6 @@ resource "docker_container" "exporter" {
     depends_on = [
         docker_container.kafka,
     ]
+
+    restart = "always"
 }
